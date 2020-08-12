@@ -65,6 +65,9 @@ kotlin {
                 // Logger support vert.x web stack
                 implementation("org.slf4j:slf4j-jdk14:1.7.7")
 
+                implementation("org.jetbrains.kotlin:kotlin-serialization:1.4.0-rc")
+
+
                 // KotlinX dependencies for JVM
                 kotlinX("coroutines-jdk8", "1.3.8-$kotlinVersion")
 
@@ -109,8 +112,12 @@ kotlin {
     }
 }
 
-tasks.withType<org.jetbrains.kotlin.gradle.targets.js.webpack.KotlinWebpack>() {
+tasks.withType<org.jetbrains.kotlin.gradle.targets.js.webpack.KotlinWebpack> {
     outputFileName = "spa.js"
+}
+
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
+    dependsOn(tasks.getByName<org.jetbrains.kotlin.gradle.targets.js.webpack.KotlinWebpack>("jsBrowserProductionWebpack"))
 }
 
 tasks.named<Wrapper>("wrapper") {
