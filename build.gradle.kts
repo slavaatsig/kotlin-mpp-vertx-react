@@ -112,8 +112,12 @@ kotlin {
     }
 }
 
-tasks.withType<org.jetbrains.kotlin.gradle.targets.js.webpack.KotlinWebpack>() {
+tasks.withType<org.jetbrains.kotlin.gradle.targets.js.webpack.KotlinWebpack> {
     outputFileName = "spa.js"
+}
+
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
+    dependsOn(tasks.getByName<org.jetbrains.kotlin.gradle.targets.js.webpack.KotlinWebpack>("jsBrowserProductionWebpack"))
 }
 
 tasks.named<Wrapper>("wrapper") {
