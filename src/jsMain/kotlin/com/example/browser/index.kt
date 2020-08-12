@@ -19,7 +19,7 @@ fun main() = with(document.getElementById("root")) {
             +"Get some data"
             attrs.onClickFunction = {
                 httpClient {
-                    val result: SomeData = get("http://localhost:18080/data")
+                    val result: SomeData = get("http://localhost:8080/data")
                     window.alert("Text: ${result.text}, number: ${result.number}")
                 }
             }

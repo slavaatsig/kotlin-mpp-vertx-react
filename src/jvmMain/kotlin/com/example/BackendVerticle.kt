@@ -34,7 +34,7 @@ class BackendVerticle : CoroutineVerticle() {
                     }
                 }.accept(it)
             }
-            .listen(18080, "localhost") { result ->
+            .listen(8080, "localhost") { result ->
                 if (result.succeeded()) {
                     log.info("Backend server is UP")
                 } else {
