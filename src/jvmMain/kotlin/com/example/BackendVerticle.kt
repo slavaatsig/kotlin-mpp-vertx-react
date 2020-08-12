@@ -25,10 +25,9 @@ class BackendVerticle : CoroutineVerticle() {
                     route(HttpMethod.GET, "/data").handler { routingContext ->
                         log.info("Data endpoint hit")
                         routingContext.response().apply {
-                         //   isChunked = true
+                            isChunked = true
                             putHeader("content-type", "application/json")
-                            val data = Json.encodeToString(SomeData("The answer is:", 42))
-                            end(data)
+                            end(Json.encodeToString(SomeData("The answer is:", 42)))
                         }
                         log.info("Data served")
                     }
