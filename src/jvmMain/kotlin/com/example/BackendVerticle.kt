@@ -21,13 +21,14 @@ class BackendVerticle : CoroutineVerticle() {
             .createHttpServer()
             .requestHandler {
                 router.apply {
-                    route().handler(StaticHandler.create("../../../distributions"))
+                    route().handler(StaticHandler.create())
                     route(HttpMethod.GET, "/data").handler { routingContext ->
                         log.info("Data endpoint hit")
                         routingContext.response().apply {
                             isChunked = true
                             putHeader("content-type", "application/json")
-                            end(Json.encodeToString(SomeData("The answer is:", 42)))
+                            write(Json.encodeToString(SomeData("The answer is:", 42)))
+                            end()
                         }
                         log.info("Data served")
                     }
@@ -37,7 +38,7 @@ class BackendVerticle : CoroutineVerticle() {
                 if (result.succeeded()) {
                     log.info("Backend server is UP")
                 } else {
-                    log.error("Backend server is failed to start, shutting down", result.cause())
+                    log.error("Backend server is failed to start, shutting down")
                     vertx.undeploy(deploymentID)
                 }
             }

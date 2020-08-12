@@ -65,9 +65,6 @@ kotlin {
                 // Logger support vert.x web stack
                 implementation("org.slf4j:slf4j-jdk14:1.7.7")
 
-                implementation("org.jetbrains.kotlin:kotlin-serialization:1.4.0-rc")
-
-
                 // KotlinX dependencies for JVM
                 kotlinX("coroutines-jdk8", "1.3.8-$kotlinVersion")
 
@@ -112,12 +109,36 @@ kotlin {
     }
 }
 
-tasks.withType<org.jetbrains.kotlin.gradle.targets.js.webpack.KotlinWebpack> {
+tasks.withType<org.jetbrains.kotlin.gradle.targets.js.webpack.KotlinWebpack>() {
     outputFileName = "spa.js"
 }
 
+val jvmWebroot by extra { "${project.sourceSets.main.get().resources.srcDirs.first()}/webroot/" }
+
+val cleanFrontendWebroot by tasks.register<Delete>("cleanFrontendWebroot") {
+    delete(file(jvmWebroot))
+    delete(fileTree(jvmWebroot).matching {
+        include("**/*")
+    })
+}
+tasks.named("clean") {
+    dependsOn(cleanFrontendWebroot)
+}
+
+val embedFrontendIntoWebroot by tasks.register<Copy>("embedFrontendIntoWebroot") {
+    dependsOn(tasks.getByName("cleanFrontendWebroot"))
+    dependsOn(tasks.getByName("jsBrowserProductionWebpack"))
+
+    from("$buildDir/distributions")
+    into(jvmWebroot)
+}
+embedFrontendIntoWebroot.mustRunAfter(tasks.getByName("jsBrowserProductionWebpack"))
+embedFrontendIntoWebroot.mustRunAfter(cleanFrontendWebroot)
+
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
-    dependsOn(tasks.getByName<org.jetbrains.kotlin.gradle.targets.js.webpack.KotlinWebpack>("jsBrowserProductionWebpack"))
+    dependsOn(tasks.getByName("jsBrowserProductionWebpack"))
+    dependsOn(tasks.getByName("cleanFrontendWebroot"))
+    dependsOn(tasks.getByName("embedFrontendIntoWebroot"))
 }
 
 tasks.named<Wrapper>("wrapper") {
