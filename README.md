@@ -14,6 +14,9 @@ target while having shared common code (like data classes and/or buisnes domain 
 Gradle configuration provide a group of tasks (Frontend integration) to start backend in a full stack mode integrated
 with the frontend built from the Kotlin/JS target.
 
+**NOTE:** _Directory `src/jvmMain/resources/webroot` must be ignored, and you should not author it as it is fully managed
+by the Gradle_
+
 ## Modules
 
 ##### Common
