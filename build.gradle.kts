@@ -14,7 +14,6 @@ repositories {
     mavenCentral()
     jcenter()
     maven("https://dl.bintray.com/kotlin/kotlin-eap")
-    maven("https://dl.bintray.com/kotlin/kotlin-dev")
     maven("https://dl.bintray.com/kotlin/kotlin-js-wrappers")
     maven("https://dl.bintray.com/kotlin/kotlinx")
     maven("https://dl.bintray.com/kotlin/ktor")
@@ -65,9 +64,6 @@ kotlin {
                 // Logger support vert.x web stack
                 implementation("org.slf4j:slf4j-jdk14:1.7.7")
 
-                implementation("org.jetbrains.kotlin:kotlin-serialization:1.4.0-rc")
-
-
                 // KotlinX dependencies for JVM
                 kotlinX("coroutines-jdk8", "1.3.8-$kotlinVersion")
 
@@ -112,21 +108,78 @@ kotlin {
     }
 }
 
-tasks.withType<org.jetbrains.kotlin.gradle.targets.js.webpack.KotlinWebpack> {
+tasks.named<Wrapper>("wrapper") {
+    gradleVersion = "6.6"
+}
+
+
+tasks.withType<org.jetbrains.kotlin.gradle.targets.js.webpack.KotlinWebpack>() {
     outputFileName = "spa.js"
 }
 
-tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
-    dependsOn(tasks.getByName<org.jetbrains.kotlin.gradle.targets.js.webpack.KotlinWebpack>("jsBrowserProductionWebpack"))
+/** A place that Vert.x expects static resources by default (where built frontend must present) */
+val jvmWebroot by extra { "${project.sourceSets.main.get().resources.srcDirs.first()}/webroot" }
+
+/** A place where Kotlin/JS produces frontend */
+val jsDistribution by extra { "$buildDir/distributions" }
+
+// Tasks that frontend integration depends upon
+val jsBrowserDevelopmentWebpack = tasks.getByName("jsBrowserDevelopmentWebpack")
+val jsBrowserProductionWebpack = tasks.getByName("jsBrowserProductionWebpack")
+
+// Custom webroot cleanup task
+val cleanWebroot by tasks.register<Delete>("cleanWebroot") {
+    group = "frontend integration"
+    delete(file(jvmWebroot))
 }
 
-tasks.named<Wrapper>("wrapper") {
-    gradleVersion = "6.5.1"
+// Hook custom cleanup task into build clean task
+tasks.named("clean") {
+    dependsOn(cleanWebroot)
 }
 
-/**
- * Shorthand helpers for declaring common artifacts
- */
+/** Copy latest js distribution into into webroot */
+val embedCurrentFrontendIntoWebroot by tasks.register<Copy>("embedCurrentFrontendIntoWebroot") {
+    group = "frontend integration"
+    from(jsDistribution)
+    into(jvmWebroot)
+    exclude { it.isDirectory && it.file.name == "webroot" }
+}
+embedCurrentFrontendIntoWebroot.mustRunAfter(cleanWebroot)
+
+/** Copy development frontend distribution into webroot */
+val embedDevelopmentFrontendIntoWebroot by tasks.register<Copy>("embedDevelopmentFrontendIntoWebroot") {
+    group = "frontend integration"
+    dependsOn(jsBrowserDevelopmentWebpack)
+    dependsOn(embedCurrentFrontendIntoWebroot)
+}
+embedDevelopmentFrontendIntoWebroot.mustRunAfter(jsBrowserDevelopmentWebpack)
+
+/** Copy production frontend distribution into webroot */
+val embedProductionFrontendIntoWebroot by tasks.register<Copy>("embedProductionFrontendIntoWebroot") {
+    group = "frontend integration"
+    dependsOn(jsBrowserProductionWebpack)
+    dependsOn(embedCurrentFrontendIntoWebroot)
+}
+embedProductionFrontendIntoWebroot.mustRunAfter(jsBrowserProductionWebpack)
+
+// Create task to start fullstack backend with development distribution
+tasks.register("runDevelopmentFullStack") {
+    group = "frontend integration"
+    dependsOn(embedDevelopmentFrontendIntoWebroot)
+    dependsOn(tasks.named("run"))
+}
+
+// Create task to start fullstack backend with production distribution
+tasks.register("runProductionFullStack") {
+    group = "frontend integration"
+    dependsOn(embedProductionFrontendIntoWebroot)
+    dependsOn(tasks.named("run"))
+}
+
+
+// Shorthand helpers for declaring common artifacts
+
 fun org.jetbrains.kotlin.gradle.plugin.KotlinDependencyHandler.vertx(artifact: String, version: String = "3.9.2") {
     implementation("io.vertx:vertx-$artifact:$version")
 }
