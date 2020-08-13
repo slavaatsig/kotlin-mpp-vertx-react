@@ -21,7 +21,9 @@ class BackendVerticle : CoroutineVerticle() {
             .createHttpServer()
             .requestHandler {
                 router.apply {
+                    // Enable handler for static assets (that will be taken from "src/jvmMain/resources/webroot")
                     route().handler(StaticHandler.create())
+                    // Serve some data class using Kotlin serialization
                     route(HttpMethod.GET, "/data").handler { routingContext ->
                         log.info("Data endpoint hit")
                         routingContext.response().apply {
