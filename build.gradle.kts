@@ -14,7 +14,6 @@ repositories {
     mavenCentral()
     jcenter()
     maven("https://dl.bintray.com/kotlin/kotlin-eap")
-    maven("https://dl.bintray.com/kotlin/kotlin-dev")
     maven("https://dl.bintray.com/kotlin/kotlin-js-wrappers")
     maven("https://dl.bintray.com/kotlin/kotlinx")
     maven("https://dl.bintray.com/kotlin/ktor")
@@ -109,45 +108,78 @@ kotlin {
     }
 }
 
+tasks.named<Wrapper>("wrapper") {
+    gradleVersion = "6.6"
+}
+
+
 tasks.withType<org.jetbrains.kotlin.gradle.targets.js.webpack.KotlinWebpack>() {
     outputFileName = "spa.js"
 }
 
-val jvmWebroot by extra { "${project.sourceSets.main.get().resources.srcDirs.first()}/webroot/" }
+/** A place that Vert.x expects static resources by default (where built frontend must present) */
+val jvmWebroot by extra { "${project.sourceSets.main.get().resources.srcDirs.first()}/webroot" }
 
-val cleanFrontendWebroot by tasks.register<Delete>("cleanFrontendWebroot") {
+/** A place where Kotlin/JS produces frontend */
+val jsDistribution by extra { "$buildDir/distributions" }
+
+// Tasks that frontend integration depends upon
+val jsBrowserDevelopmentWebpack = tasks.getByName("jsBrowserDevelopmentWebpack")
+val jsBrowserProductionWebpack = tasks.getByName("jsBrowserProductionWebpack")
+
+// Custom webroot cleanup task
+val cleanWebroot by tasks.register<Delete>("cleanWebroot") {
+    group = "frontend integration"
     delete(file(jvmWebroot))
-    delete(fileTree(jvmWebroot).matching {
-        include("**/*")
-    })
 }
+
+// Hook custom cleanup task into build clean task
 tasks.named("clean") {
-    dependsOn(cleanFrontendWebroot)
+    dependsOn(cleanWebroot)
 }
 
-val embedFrontendIntoWebroot by tasks.register<Copy>("embedFrontendIntoWebroot") {
-    dependsOn(tasks.getByName("cleanFrontendWebroot"))
-    dependsOn(tasks.getByName("jsBrowserProductionWebpack"))
-
-    from("$buildDir/distributions")
+/** Copy latest js distribution into into webroot */
+val embedCurrentFrontendIntoWebroot by tasks.register<Copy>("embedCurrentFrontendIntoWebroot") {
+    group = "frontend integration"
+    from(jsDistribution)
     into(jvmWebroot)
+    exclude { it.isDirectory && it.file.name == "webroot" }
 }
-embedFrontendIntoWebroot.mustRunAfter(tasks.getByName("jsBrowserProductionWebpack"))
-embedFrontendIntoWebroot.mustRunAfter(cleanFrontendWebroot)
+embedCurrentFrontendIntoWebroot.mustRunAfter(cleanWebroot)
 
-tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
-    dependsOn(tasks.getByName("jsBrowserProductionWebpack"))
-    dependsOn(tasks.getByName("cleanFrontendWebroot"))
-    dependsOn(tasks.getByName("embedFrontendIntoWebroot"))
+/** Copy development frontend distribution into webroot */
+val embedDevelopmentFrontendIntoWebroot by tasks.register<Copy>("embedDevelopmentFrontendIntoWebroot") {
+    group = "frontend integration"
+    dependsOn(jsBrowserDevelopmentWebpack)
+    dependsOn(embedCurrentFrontendIntoWebroot)
+}
+embedDevelopmentFrontendIntoWebroot.mustRunAfter(jsBrowserDevelopmentWebpack)
+
+/** Copy production frontend distribution into webroot */
+val embedProductionFrontendIntoWebroot by tasks.register<Copy>("embedProductionFrontendIntoWebroot") {
+    group = "frontend integration"
+    dependsOn(jsBrowserProductionWebpack)
+    dependsOn(embedCurrentFrontendIntoWebroot)
+}
+embedProductionFrontendIntoWebroot.mustRunAfter(jsBrowserProductionWebpack)
+
+// Create task to start fullstack backend with development distribution
+tasks.register("runDevelopmentFullStack") {
+    group = "frontend integration"
+    dependsOn(embedDevelopmentFrontendIntoWebroot)
+    dependsOn(tasks.named("run"))
 }
 
-tasks.named<Wrapper>("wrapper") {
-    gradleVersion = "6.5.1"
+// Create task to start fullstack backend with production distribution
+tasks.register("runProductionFullStack") {
+    group = "frontend integration"
+    dependsOn(embedProductionFrontendIntoWebroot)
+    dependsOn(tasks.named("run"))
 }
 
-/**
- * Shorthand helpers for declaring common artifacts
- */
+
+// Shorthand helpers for declaring common artifacts
+
 fun org.jetbrains.kotlin.gradle.plugin.KotlinDependencyHandler.vertx(artifact: String, version: String = "3.9.2") {
     implementation("io.vertx:vertx-$artifact:$version")
 }
